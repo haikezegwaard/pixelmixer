@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Read Pixels Example</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link href="css/main.css" rel="stylesheet" />
+
+
+		<!-- Import standard three.js stuff -->
+		<script src="libs/Detector.js"></script>
+		<script src="libs/three.min.js"></script>
+		<script src="libs/TrackballControls.js"></script>
+
+
+		<!-- Import library -->
+		<script src="../build/pixelmixer.min.js"></script>
+
+
+		<!-- Import Shaders -->
+		<script src="import/shaders/SimpleSwirl.js"></script>
+		<script src="import/shaders/BasicTest.js"></script>
+        <script src="import/shaders/Water.js"></script>
+
+        <script src="import/animations/snow.js"></script>
+
+		<!-- Import a 'Broadcast Tech' to define how to use the RGB values -->
+		<script src="import/techs/testBroadcast.js"></script>
+
+		<script type="x-shader/x-fragment" id="fragment-shader">
+			uniform vec3 color;
+			uniform float opacity;
+			uniform sampler2D texture;
+			void main() {
+				vec4 texColor = texture2D( texture, gl_PointCoord );
+				gl_FragColor = texColor * vec4( color, opacity );
+			}
+		</script>
+
+		<script>
+
+			if ( !Detector.webgl ) { Detector.addGetWebGLMessage(); } else {
+
+				var glWidth = window.innerWidth;
+				var glHeight = window.innerHeight;
+
+				var scene;
+				var renderer;
+				var camera;
+				var controls;
+				var container;
+				var clock;
+				var systemGeometry;
+				var particles = [];
+				var numParticles = 10000;
+                var particleSystem;
+
+                function onLoad(){
+
+
+					// ----------------
+                    clock = new THREE.Clock();
+
+					// ** Standard Three.js setup
+                	scene = new THREE.Scene();
+
+					renderer = new THREE.WebGLRenderer();
+					renderer.setSize( glWidth, glHeight );
+					renderer.autoClear = false;
+
+					container = document.getElementById( 'container' );
+					container.appendChild( renderer.domElement );
+
+					camera = new THREE.PerspectiveCamera( 30, glWidth / glHeight, 1, 100000 );
+					camera.position.z = 15000;
+					camera.position.x = -5000;
+					controls = new THREE.TrackballControls( camera, renderer.domElement);
+                    // ** Initialize PixelMixer
+
+					PX.init(scene, renderer, { broadcast: true, readPixels: true  });
+					PX.setSize(glWidth, glHeight);
+                    clock = new THREE.Clock();
+                    // init snow
+                    systemGeometry = new THREE.Geometry();
+
+                    var material = new THREE.PointsMaterial( { color: 0x888888 } );
+                    for (var i = 0; i < numParticles; i++) {
+
+                        particle = new Particle3D( material);
+                        particle.position.x = Math.random() * 2000 - 1000;
+                        particle.position.y = Math.random() * 2000 - 1000;
+                        particle.position.z = Math.random() * 2000 - 1000;
+                        particle.scale.x = particle.scale.y =  1;
+                        particles.push(particle);
+                        systemGeometry.vertices.push(particle.position);
+                    }
+
+                    particleSystem = new THREE.Points( systemGeometry, material );
+                    scene.add(particleSystem);
+
+                    PX.hardware.importVertices({vertices: systemGeometry.vertices.slice(numParticles/2), port: 1});
+                    PX.hardware.importVertices({vertices: systemGeometry.vertices.slice(numParticles/2, numParticles), port: 2});
+                    PX.updateNodePoints();
+
+					// ----------------
+
+					// This tells the 'testBroadcast' tech to broadcast the color values of the port we just created
+					PX.ports.getPort(1).type = "testBroadcast";
+					PX.ports.getPort(1).broadcast = true;
+
+
+					// ----------------
+
+
+					// ** Load in custom sprite for all nodes (default: id = 0)
+
+					PX.hardware.loadCustomPointSprite(0, PX.pointSize, "images/spark.png", function(texture){
+						PX.updateNodePoints();
+					});
+
+
+					// ----------------
+
+
+					// ** Add a shader to Channel 1
+					PX.simpleSetup({channel: 1, ids: ["Water"]});
+					PX.simpleSetup({channel: 2, ids: ["BasicTest"]});
+
+
+
+					// ----------------
+
+
+					// ** Start the main loop
+
+					animate();
+
+
+				}
+
+				// returns a random number between the two limits provided
+                function randomRange(min, max) {
+                    return ((Math.random() * (max - min)) + min);
+                }
+
+				function animate() {
+
+					if(PX.ready){
+                        var delta = clock.getDelta(),
+			                elapsedTime = clock.getElapsedTime();
+
+                        for(var i = 0; i<particles.length; i++) {
+
+                            var particle = particles[i];
+                            particle.updatePhysics();
+
+                            with(particle.position) {
+                                if(y<-1000) y+=2000;
+                                if(x>1000) x-=2000;
+                                else if(x<-1000) x+=2000;
+                                if(z>1000) z-=2000;
+                                else if(z<-1000) z+=2000;
+                            }
+                            systemGeometry.vertices[i] = particle.position;
+                        }
+					    PX.updateNodePoints();
+                        PX.update();
+						controls.update();
+						renderer.render( scene, camera );
+                        // ** Capture RGB values
+						// In addition to using Tech's to capture RGB values, we can also access it directly:
+//
+
+						//console.log(PX.pixels);
+
+					}
+
+					requestAnimationFrame( animate );
+				}
+
+
+				function onWindowResize() {
+
+					// Resize logic
+					glWidth = window.innerWidth;
+					glHeight = window.innerHeight;
+
+					PX.setSize(glWidth, glHeight);
+
+					camera.aspect = glWidth / glHeight;
+					camera.updateProjectionMatrix();
+					controls.handleResize();
+
+				}
+				window.addEventListener( 'resize', onWindowResize, false );
+
+			}
+
+		</script>
+
+	</head>
+
+	<body ontouchstart="" onload="onLoad()">
+		<div id="container"></div>
+
+	</body>
+
+</html>
+

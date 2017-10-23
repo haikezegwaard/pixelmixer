@@ -19,11 +19,15 @@
 
 		<!-- Import Shaders -->
 		<script src="import/shaders/SimpleSwirl.js"></script>
+		<script src="import/shaders/BasicTest.js"></script>
 
 
 		<!-- Import a 'Broadcast Tech' to define how to use the RGB values -->
 		<script src="import/techs/testBroadcast.js"></script>
 
+		<script src="import/animations/fireworks.js"></script>
+		<script src="import/animations/explosion.js"></script>
+		<script src="import/animations/snow.js"></script>
 
 		<script>
 
@@ -37,6 +41,10 @@
 				var camera;
 				var controls;
 				var container;
+				var firework;
+				var particles = [];
+				var particleImage = new Image(); //THREE.ImageUtils.loadTexture( "http://i.imgur.com/cTALZ.png" );
+				particleImage.src = 'http://i.imgur.com/cTALZ.png';
 
 				function onLoad(){
 
@@ -56,34 +64,25 @@
 					container.appendChild( renderer.domElement ); 
 
 					camera = new THREE.PerspectiveCamera( 30, glWidth / glHeight, 1, 100000 );
-					camera.position.z = 2000;
+					camera.position.z = 15000;
+					camera.position.x = -5000;
 					controls = new THREE.TrackballControls( camera, renderer.domElement);
-
-
-					// ----------------
 
 
 					// ** Initialize PixelMixer
 
-					PX.init(scene, renderer, { broadcast: true, readPixels: true });
+					PX.init(scene, renderer, { broadcast: true, readPixels: true  });
 					PX.setSize(glWidth, glHeight);
 
+					firework = new Firework( scene );
+					explosion = new ExplodeAnimation(10, 10);
+					PX.hardware.importVertices({vertices: firework.geometry.vertices, port: 1});
+
+
+					particleSystem = createParticleSystem();
+  					scene.add(particleSystem);
 
 					// ----------------
-
-
-					// ** Add a simple grid of Nodes 
-
-					var params = {};		// Position coordinates for the entire grid
-					params.x = -850;		
-					params.y = -300;
-					params.z = -0;
-					params.width = 52;		// How many pixels for the entire grid
-					params.height = 20;
-					params.pitch = 33;		// How far each pixel is spaced
-
-					PX.hardware.addSimpleNodeGrid(params);
-
 
 					// This tells the 'testBroadcast' tech to broadcast the color values of the port we just created
 					PX.ports.getPort(1).type = "testBroadcast";
@@ -118,11 +117,61 @@
 
 				}
 
+				function createParticleSystem() {
+
+					// The number of particles in a particle system is not easily changed.
+					var particleCount = 500;
+
+					// Particles are just individual vertices in a geometry
+					// Create the geometry that will hold all of the vertices
+					var particles = new THREE.Geometry();
+
+					// Create the vertices and add them to the particles geometry
+					for (var p = 0; p < particleCount; p++) {
+
+						// This will create all the vertices in a range of -200 to 200 in all directions
+						var x = Math.random() * 400 - 200;
+						var y = Math.random() * 400 - 200;
+						var z = Math.random() * 400 - 200;
+
+						// Create the vertex
+						var particle = new THREE.Vector3(x, y, z);
+
+						// Add the vertex to the geometry
+						particles.vertices.push(particle);
+					}
+					var material = new THREE.PointsMaterial(
+					    {
+					        map: new THREE.Texture(particleImage),
+							size: 16,
+							color: 0xffffff,
+							opacity: 1,
+							vertexColors: true,
+							transparent: true,
+							depthTest: false,
+						});
+					// Create the particle system
+					particleSystem = new THREE.Points(particles, material);
+
+					return particleSystem;
+				}
+
 				function animate() {
 
-					// Main update loop
-
 					if(PX.ready){
+						// explosion effect
+					    explosion.update();
+					    // rockets
+					    firework.update();
+					    if(firework.done){
+					        firework = new Firework(scene);
+						}else {
+                            PX.hardware.importVertices({
+                                vertices: firework.geometry.vertices,
+                                port: 1
+                            });
+                            PX.updateNodePoints();
+                        }
 
 						PX.update();
 						controls.update();
@@ -168,3 +217,4 @@
 	</body>
 
 </html>
+
