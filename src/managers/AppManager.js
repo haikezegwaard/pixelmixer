@@ -61,7 +61,6 @@ PX.AppManager.prototype = {
 
 		//PX.updateNodePoints();
 		//this.updateMainSourceShader();
-
 		if(PX.readPixels){
 			PX.pixels = new Uint8Array(4 * Math.pow(PX.simSize, 2));
 			this.gl = this.renderer.getContext();

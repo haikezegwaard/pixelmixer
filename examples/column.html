@@ -15,6 +15,7 @@
 
 		<!-- Import library -->
 		<script src="../build/pixelmixer.js"></script>
+        <script src="import/techs/testBroadcast.js"></script>
 
 
 		<!-- Import Shaders Here -->
@@ -66,9 +67,9 @@
 
 					// ** Initialize PixelMixer
 
-					PX.init(scene, renderer);
+					PX.init(scene, renderer, {broadcast: true, readPixels: true});
 					PX.setSize(glWidth, glHeight);
-
+                    console.log("size display squared: " + (glWidth * glHeight));
 
 					// ----------------
 
@@ -78,8 +79,9 @@
 					var node_x = 0;
 					var node_y = 0;
 					var node_z =  0;
-					var node_width =  20;
-					var node_height =  20;
+					var node_width =  2;
+					var node_height =  2;
+					var node_depth = 2;
 
 					var node_xstack = 0;
 					var node_ystack = 0;
@@ -91,7 +93,7 @@
 					var node_gap_x = 42;
 
 					var nodes = [];
-					for ( var o = 0; o < 150; o ++) {
+					for ( var o = 0; o < node_depth; o ++) {
                         for (var e = 0; e < node_width; e++) {
 
                             for (i = 0; i < node_height; i++) {
@@ -116,12 +118,12 @@
 					// Set the new group of nodes to Port 1
 					var port = new PX.Port({name: "Port " + 1, nodes: nodes});
 					PX.ports.setPort(1, port);
-
+                    PX.ports.getPort(1).nodesType = 0;
 
                     var neighbours = [];
 					var loader = new THREE.JSONLoader();
 					loader.load( 'import/meshs/suzanne/suzanneHi.js', function ( geometry ) {
-                        geometry.translate(150, 100,-100);
+                        geometry.translate(150, 150,-100);
 						for (var i = 0; i < geometry.vertices.length; i++) {
 
 							// Scale
@@ -133,7 +135,7 @@
 
 							geometry.vertices[i].z *= -1; // flip z
 
-                            var nn = findNearestNeighBour(geometry.vertices[i], nodes, 70);
+                            var nn = findNearestNeighBour(geometry.vertices[i], nodes, 70, node_width, node_height, node_depth);
                             if(nn){
 
                                 neighbours.push(nn);
@@ -144,9 +146,11 @@
 
 						geometry.computeVertexNormals();
 
-						PX.hardware.importVertices({vertices: geometry.vertices, port: 2});
-						var port = new PX.Port({name: "Port " + 2, nodes: neighbours});
-						PX.ports.setPort(3, port);
+//						PX.hardware.importVertices({vertices: geometry.vertices, port: 2});
+//						PX.ports.getPort(2).nodesType = 1;
+//						var port = new PX.Port({name: "Port " + 3,
+//                            nodes: neighbours, broadcast: true, type: "testBroadcast", nodesType: 2});
+//						PX.ports.setPort(3, port);
 						PX.updateNodePoints();
 
 					} );
@@ -157,19 +161,31 @@
 
 
 					// ** Load in custom sprite for all nodes (default: id = 0)
+//
+//					PX.hardware.loadCustomPointSprite(0, PX.pointSize, "images/disc.png", function(texture){
+//						PX.updateNodePoints();
+//					});
 
-					PX.hardware.loadCustomPointSprite(0, PX.pointSize, "images/disc.png", function(texture){
-						PX.updateNodePoints();
+					// Load the Sprite textures one after another and then updateNodePoints()
+					PX.hardware.loadCustomPointSprite(0, 14, "images/disc.png", function(){
+						PX.hardware.loadCustomPointSprite(1, 25, "images/ball.png", function(){
+							PX.hardware.loadCustomPointSprite(2, 16, "images/fun1.png", function(){
+								PX.updateNodePoints();
+							});
+						});
 					});
 
+
+
+                    // This tells the 'testBroadcast' tech to broadcast the color values of the port we just created
 
 					// ----------------
 
 
 					// ** Add a shader to Channel 1, Pod 1, Clip 1
 
-					//PX.simpleSetup({channel: 1, ids: ["Water"]});
-                    noBlendSimpleSetup({channel: 1, ids: ["Water"], mix: 0});
+					PX.simpleSetup({channel: 1, ids: ["BasicTest"]});
+                    //noBlendSimpleSetup({channel: 1, ids: ["Water"], mix: 0});
                     //noBlendSimpleSetup({channel: 2, ids: ["BasicTest"], mix: 0.5});
                     //noBlendSimpleSetup({channel: 3, ids: ["TestShader"], mix: 0.01});
                     //PX.simpleSetup({channel: 3, ids: ["TestShader"]});
@@ -205,15 +221,16 @@
                     PX.channels.setChannel(params.channel, channel1);
                 };
 
-				function findNearestNeighBour(vector, nodes, resolution){
+				function findNearestNeighBour(vector, nodes, resolution, width, height, depth){
+				    var slice_size = width * height;
 				    var x_index = Math.floor(vector.x / resolution);
                     var z_index = Math.floor(vector.z / resolution);
-                    var schijf = nodes.slice(z_index * 400, (z_index +1) * 400);
+                    var schijf = nodes.slice(z_index * slice_size, (z_index +1) * slice_size);
                     var y_index = Math.floor(vector.y / resolution);
-                    var reeks = schijf.slice(y_index * 20, (y_index +1) * 20);
+                    var reeks = schijf.slice(y_index * width, (y_index +1) * height);
                     return reeks[x_index];
                 }
-
+                var show = true;
 				function animate() {
 
 					// Main update loop
@@ -224,7 +241,11 @@
 
 						// Update Three.js
 						controls.update();
-						renderer.render( scene, camera );
+						//renderer.render( scene, camera );
+						if(true) {
+                            console.log(PX.pixels);
+                            show = false;
+                        }
 					}
 
 					// Keep repeating the animation loop
